@@ -23,6 +23,7 @@ DB_USER=u779607948_admin
 DB_PASSWORD=tu_password_de_hostinger
 DB_NAME=u779607948_gamingApp
 JWT_SECRET=tu_clave_secreta_jwt
+JWT_EXPIRES_IN=24h
 PORT=3000
 NODE_ENV=production
 ```
