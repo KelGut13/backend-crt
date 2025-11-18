@@ -335,7 +335,7 @@ router.put('/update', authenticateToken, async (req, res) => {
 
       // Actualizar con nueva contraseña
       await pool.query(
-        'UPDATE users SET nombres = ?, primerApellido = ?, segundoApellido = ?, password = ?, ultimaActualizacion = NOW() WHERE id = ?',
+        'UPDATE users SET nombres = ?, primerApellido = ?, segundoApellido = ?, passwordHash = ?, ultimaActualizacion = NOW() WHERE id = ?',
         [nombres, primerApellido, segundoApellido || null, hashedPassword, userId]
       );
 
