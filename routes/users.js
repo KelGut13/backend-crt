@@ -310,7 +310,7 @@ router.put('/update', authenticateToken, async (req, res) => {
       
       // Obtener la contraseña actual del usuario
       const [users] = await pool.query(
-        'SELECT password FROM users WHERE id = ?',
+        'SELECT passwordHash FROM users WHERE id = ?',
         [userId]
       );
 
@@ -322,7 +322,7 @@ router.put('/update', authenticateToken, async (req, res) => {
       }
 
       // Verificar contraseña actual
-      const isPasswordValid = await bcrypt.compare(currentPassword, users[0].password);
+      const isPasswordValid = await bcrypt.compare(currentPassword, users[0].passwordHash);
       if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
