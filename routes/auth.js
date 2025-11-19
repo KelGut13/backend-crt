@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
+const { sendPasswordResetEmail } = require('../config/email');
 
 const router = express.Router();
 
@@ -245,16 +246,32 @@ router.post('/forgot-password', async (req, res) => {
     console.log(`✅ Código de recuperación generado para ${email}: ${resetCode}`);
     console.log(`⏰ Expira: ${expiresAt.toLocaleString()}`);
 
-    // Retornar el código (en producción esto se enviaría por email)
-    res.json({
-      success: true,
-      message: 'Código de recuperación generado',
-      data: {
-        resetCode, // En producción, no enviar esto y usar email
-        email: user.email,
-        expiresIn: '15 minutos'
-      }
-    });
+    // Enviar email con el código
+    try {
+      await sendPasswordResetEmail(user.email, resetCode);
+      console.log(`📧 Email enviado exitosamente a ${user.email}`);
+      
+      res.json({
+        success: true,
+        message: 'Se ha enviado un código de recuperación a tu email',
+        data: {
+          email: user.email,
+          expiresIn: '15 minutos'
+        }
+      });
+    } catch (emailError) {
+      console.error('❌ Error enviando email:', emailError);
+      // Si el email falla, devolver el código en la respuesta (fallback)
+      res.json({
+        success: true,
+        message: 'Código de recuperación generado (el email no pudo ser enviado)',
+        data: {
+          resetCode, // Fallback: mostrar código si email falla
+          email: user.email,
+          expiresIn: '15 minutos'
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Error en recuperación de contraseña:', error);
