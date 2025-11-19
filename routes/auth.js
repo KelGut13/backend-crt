@@ -223,37 +223,119 @@ router.post('/forgot-password', async (req, res) => {
     );
 
     // Por seguridad, siempre responder con éxito aunque el email no exista
-    // Esto previene que se pueda verificar qué emails están registrados
     if (users.length === 0) {
       return res.json({
         success: true,
-        message: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña'
+        message: 'Si el email está registrado, recibirás un código de recuperación'
       });
     }
+
+    const user = users[0];
 
     // Generar un código de recuperación de 6 dígitos
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // Expira en 15 minutos
 
-    // Guardar el código en la base de datos (necesitarás crear esta tabla)
-    // Por ahora solo simularemos el envío
-    console.log(`Código de recuperación para ${email}: ${resetCode}`);
-    console.log(`Expira: ${expiresAt}`);
+    // Guardar el código en la base de datos
+    await pool.query(
+      'INSERT INTO password_resets (userId, resetCode, expiresAt) VALUES (?, ?, ?)',
+      [user.id, resetCode, expiresAt]
+    );
 
-    // En producción, aquí enviarías un email con el código
-    // Por ahora retornamos el código en la respuesta (solo para desarrollo)
+    console.log(`✅ Código de recuperación generado para ${email}: ${resetCode}`);
+    console.log(`⏰ Expira: ${expiresAt.toLocaleString()}`);
+
+    // Retornar el código (en producción esto se enviaría por email)
     res.json({
       success: true,
-      message: 'Si el email existe, recibirás instrucciones para recuperar tu contraseña',
-      // Solo en desarrollo - eliminar en producción
-      dev: {
-        resetCode,
-        email: users[0].email
+      message: 'Código de recuperación generado',
+      data: {
+        resetCode, // En producción, no enviar esto y usar email
+        email: user.email,
+        expiresIn: '15 minutos'
       }
     });
 
   } catch (error) {
     console.error('Error en recuperación de contraseña:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error en el servidor'
+    });
+  }
+});
+
+// POST /api/auth/reset-password - Restablecer contraseña con código
+router.post('/reset-password', async (req, res) => {
+  const { email, resetCode, newPassword } = req.body;
+
+  try {
+    if (!email || !resetCode || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, código y nueva contraseña son requeridos'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña debe tener al menos 6 caracteres'
+      });
+    }
+
+    // Buscar el usuario
+    const [users] = await pool.query(
+      'SELECT id FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    const userId = users[0].id;
+
+    // Verificar el código de recuperación
+    const [resets] = await pool.query(
+      'SELECT * FROM password_resets WHERE userId = ? AND resetCode = ? AND used = FALSE AND expiresAt > NOW() ORDER BY createdAt DESC LIMIT 1',
+      [userId, resetCode]
+    );
+
+    if (resets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código inválido o expirado'
+      });
+    }
+
+    // Hash de la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar la contraseña
+    await pool.query(
+      'UPDATE users SET passwordHash = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    // Marcar el código como usado
+    await pool.query(
+      'UPDATE password_resets SET used = TRUE WHERE id = ?',
+      [resets[0].id]
+    );
+
+    console.log(`✅ Contraseña restablecida para usuario ${userId}`);
+
+    res.json({
+      success: true,
+      message: 'Contraseña restablecida exitosamente'
+    });
+
+  } catch (error) {
+    console.error('Error al restablecer contraseña:', error);
     res.status(500).json({
       success: false,
       message: 'Error en el servidor'
