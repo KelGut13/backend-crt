@@ -1,23 +1,13 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// Configuración del transporter de email
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER, // Tu email de Gmail
-    pass: process.env.EMAIL_PASSWORD // Tu contraseña de aplicación de Gmail
-  }
-});
+// Usar Resend en lugar de Gmail (funciona mejor con Railway)
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
  * Enviar email de recuperación de contraseña
  */
 const sendPasswordResetEmail = async (email, resetCode) => {
-  const mailOptions = {
-    from: `"CRT Community" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Recuperación de Contraseña - CRT Community',
-    html: `
+  const emailContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -113,13 +103,23 @@ const sendPasswordResetEmail = async (email, resetCode) => {
         </div>
       </body>
       </html>
-    `
-  };
+    `;
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email enviado:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    const { data, error } = await resend.emails.send({
+      from: 'CRT Community <onboarding@resend.dev>',
+      to: [email],
+      subject: 'Recuperación de Contraseña - CRT Community',
+      html: emailContent
+    });
+
+    if (error) {
+      console.error('❌ Error enviando email:', error);
+      throw error;
+    }
+
+    console.log('✅ Email enviado:', data.id);
+    return { success: true, messageId: data.id };
   } catch (error) {
     console.error('❌ Error enviando email:', error);
     throw error;
