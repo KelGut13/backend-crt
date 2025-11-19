@@ -48,11 +48,11 @@ router.post('/register', async (req, res) => {
     // Hashear la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insertar nuevo usuario (nota: columna es 'passwordHash' no 'password')
+    // Insertar nuevo usuario con photoURL por defecto (nota: columna es 'passwordHash' no 'password')
     const [result] = await pool.query(
-      `INSERT INTO users (gamerId, nombres, primerApellido, segundoApellido, username, email, passwordHash) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [gamerId, nombres, primerApellido, segundoApellido || null, username, email, hashedPassword]
+      `INSERT INTO users (gamerId, nombres, primerApellido, segundoApellido, username, email, passwordHash, photoURL) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [gamerId, nombres, primerApellido, segundoApellido || null, username, email, hashedPassword, 'default']
     );
 
     // Generar token JWT
