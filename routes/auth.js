@@ -287,6 +287,8 @@ router.post('/reset-password', async (req, res) => {
   const { email, resetCode, newPassword } = req.body;
 
   try {
+    console.log('🔐 Intento de reset password:', { email, resetCode: resetCode?.substring(0, 3) + '***' });
+
     if (!email || !resetCode || !newPassword) {
       return res.status(400).json({
         success: false,
@@ -308,6 +310,7 @@ router.post('/reset-password', async (req, res) => {
     );
 
     if (users.length === 0) {
+      console.log('❌ Usuario no encontrado:', email);
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
@@ -315,6 +318,14 @@ router.post('/reset-password', async (req, res) => {
     }
 
     const userId = users[0].id;
+    console.log('✅ Usuario encontrado, ID:', userId);
+
+    // Verificar todos los códigos disponibles para este usuario (debugging)
+    const [allResets] = await pool.query(
+      'SELECT id, resetCode, used, expiresAt, createdAt FROM password_resets WHERE userId = ? ORDER BY createdAt DESC LIMIT 5',
+      [userId]
+    );
+    console.log('📋 Códigos disponibles para usuario:', allResets);
 
     // Verificar el código de recuperación
     const [resets] = await pool.query(
@@ -323,11 +334,14 @@ router.post('/reset-password', async (req, res) => {
     );
 
     if (resets.length === 0) {
+      console.log('❌ Código no válido. Buscado:', resetCode);
       return res.status(400).json({
         success: false,
         message: 'Código inválido o expirado'
       });
     }
+
+    console.log('✅ Código válido encontrado');
 
     // Hash de la nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);
